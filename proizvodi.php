@@ -2,26 +2,31 @@
   session_start();
   $xml = new DOMDocument();
   $xml->load('proizvodi.xml');
-  
-   $veza = new PDO("mysql:dbname=zacinskobiljecompany;host=localhost", "admin", "adminpass");
-   $veza->exec("set names utf8");
-  
-	   if(isset($_POST['deleteBtn']))
-		  {
-			$id  = $_POST['id'];
-			$query = $veza->prepare("DELETE FROM zacinskobilje WHERE zbID=?");
-			$query->bindValue(1, $id, PDO::PARAM_INT);
-			$value = $query->execute();
-		  }
+  $error = false;
+ 
+  if(isset($_POST['obrisiDugme']))
+  {    
+    $docElement = $xml->documentElement;
+    $podaci = $docElement->getElementsByTagName('Spice');
+    $rmv = null;
+    $i = $_POST['obrisiDugme'];
+    $rmv = $podaci[$i];
+    if($rmv != null) $docElement->removeChild($rmv);
+                  
+    file_put_contents('proizvodi.xml', $xml->saveXML());
+  }
 
-	if(isset($_POST['addBtn']))
+if(isset($_POST['dodajDugme']))
 {
     if($_POST['name'] != "" && $_POST['cuisine'] != "" && $_POST['flavor'] != "" && $_POST['usage'] != "" && $_POST['price'] != "")
     {
         $rootTag = $xml->getElementsByTagName("AllSpices")->item(0);
+        
         $dataTag = $xml->createElement("Spice");
+        
         $nameTag = $xml->createElement("Name");
         $nameTag->appendChild($xml->createTextNode($_REQUEST['name']));
+        
         $cuisineTag  = $xml->createElement("Cuisine");
         $cuisineTag->appendChild($xml->createTextNode($_REQUEST['cuisine']));
         $flavorTag = $xml->createElement("Flavor");
@@ -30,11 +35,13 @@
         $usageTag->appendChild($xml->createTextNode($_REQUEST['usage']));
 		$priceTag = $xml->createElement("Price");
         $priceTag->appendChild($xml->createTextNode($_REQUEST['price']));
+        
         $dataTag->appendChild($nameTag);
 		$dataTag->appendChild($cuisineTag);
         $dataTag->appendChild($flavorTag);
         $dataTag->appendChild($usageTag);
 		$dataTag->appendChild($priceTag);
+        
         $rootTag->appendChild($dataTag);
         $xml->save('proizvodi.xml');
         header('Location:'.$_SERVER['PHP_SELF']);
@@ -84,7 +91,7 @@
       </ul>
     </nav>
   </div>
-  <?php } }
+  <?php } } 
    if((!isset($_SESSION['user']) || $_SESSION['user'] == "unknown")) { ?>
    <div class="inner">
     <nav>
@@ -116,6 +123,7 @@
   <?php } ?>
 </header>
 
+
 <div class="list">
   <ul>
     <li>Spice</li>
@@ -125,31 +133,32 @@
     <li>Price</li>
 	<li></li>
   </ul>
+    
+
       <?php
         $xml = simplexml_load_file('proizvodi.xml');
         $x = 1;
-        $rezultat = $veza->query("select zbID, zbName, zbCuisine, zbFlavor, zbUse, zbPrice from zacinskobilje");
+        foreach ($xml->children() as  $value) { ?>
 
-        foreach ($rezultat as  $biljka) { ?>
-          <ul>
-              <li> <?php print $biljka['zbName'] ?> </li>
-              <li><p> <?php print $biljka['zbCuisine'] ?> </p></li>
-              <li> <?php print $biljka['zbFlavor'] ?> </li>
-  		        <li><p> <?php print $biljka['zbUse'] ?> </p></li>
-  		        <li> <?php print $biljka['zbPrice'] ?> </li>
-				<li>
-      		      <?php if(isset($_SESSION['user']) && $_SESSION['user'] == "admin"){?>
-                  <form action='proizvodi.php' method='post'>
-				  <button type="submit" name="deleteBtn" value="<?php echo $x;?>"> Delete </button>
-				  <input type="hidden" name="id" value="<?php print $biljka['zbID']?>">
-                  </form>
-                <?php } ?>
-              </li>
-          </ul>
-      <?php $x++; }  ?>
+        <ul>
+          <li> <?php print $value->Name ?> </li>
+          <li><p> <?php print $value->Cuisine ?> </p></li> 
+          <li> <?php print $value->Flavor ?> </li> 
+		  <li><p> <?php print $value->Use ?> </p></li> 
+		  <li> <?php print $value->Price ?> </li> 
+		  <?php if(isset($_SESSION['user']) && $_SESSION['user'] == "admin"){?>
+          <li> 
+            <form action='proizvodi.php' method='post'>
+            <button type="submit" name="obrisiDugme" value="<?php echo $x;?>"> Delete </button>
+            </form>
+          </li>
+          <?php } ?>
+        </ul>
+        <?php $x++; }  ?>
 </div>
-
+	
 	<?php
+         
         if(isset($_SESSION['user']) && $_SESSION['user'] == "admin"){ ?>
 
           <form align='center' id='proizvodForma' action='proizvodi.php' method='post'>;
@@ -159,24 +168,19 @@
             <input type='text' id="SpiceFlavor" name='flavor' placeholder='Flavor'>
 			<input type='text' id="SpiceUsage" name='usage' placeholder='Usage'>
             <input type='text' id="SpicePrice" name='price' placeholder='Price'>
-            <input id='dodaj-button' name='addBtn' type='submit' value='Add' />
-        <?php } ?>
+            <input id='dodaj-button' name='dodajDugme' type='submit' value='Add' />
+            <?php if($error == true) { ?>
+              <p style="padding-top:1.5%; padding-bottom:0.2%; margin-left:-50px;" id="warningMessage"> Podaci nisu u ispravnom formatu! </p>
+        <?php }} ?>
           </form>
 
-        <!-- Izvjestaji-->
         <div style="padding-left:43%; padding-top:2%;">
-			<form style="display:inline-block;" id="searchForma" action="pretraga.php">
-              <input id="pretraga-button" type="submit" value="Pretraga">
-            </form>
 			<?php if(isset($_SESSION['user']) && $_SESSION['user'] == "admin") { ?>
             <form style="display:inline-block;" id="izvjestajForma" action="izvjestaj.php">
               <input id="izvjestaj-button" type="submit" value="PDF izvještaj">
             </form>
             <form style="display:inline-block;" id="downloadForma" action="downloadcsv.php">
               <input id="download-button" type="submit" value="Download csv">
-            </form>
-			<form style="display:inline-block;" id="konverzijaForma" action="xmltodb.php">
-              <input id="konverzija-button" type="submit" value="XML to DB">
             </form>
             <?php } ?>
 		</div>
@@ -185,15 +189,15 @@
 		<p class="footer-motto">Proizvodimo začine i začinsko bilje i donosimo ih na kućnu adresu.
 		Damo im dodatni šarm tako što raznovrsne začine pakujemo u vrećice zvane “MAGIJA - Ćiribu Ćiriba”.</p>
 		<p class="footer-links">
-			<a href="index.php">HOME</a>
+			<a href="Home.html">HOME</a>
 			·
-			<a href="o_nama.php">O NAMA</a>
+			<a href="O_nama.html">O NAMA</a>
 			·
 			<a href="#">ZB PAKETI</a>
 			·
-			<a href="proizvodi.php">ZAČINSKO BILJE</a>
+			<a href="#">ZAČINSKO BILJE</a>
 			·
-			<a href="kontakt.php">KONTAKT</a>
+			<a href="Kontakt.html">KONTAKT</a>
 		</p>
 
 		<p class="footer-copyright">Copyright &copy; ZB Company 2016</p>
